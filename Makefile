@@ -1,4 +1,4 @@
-COMMONFLAGS := -W -Wall -W -Werror -MMD -MP -O -g -Wno-missing-field-initializers
+COMMONFLAGS := -W -Wall -W -Werror -MMD -MP -O -g -Wno-missing-field-initializers -Wno-implicit-fallthrough
 CFLAGS := -std=gnu99 $(COMMONFLAGS) -Wno-missing-field-initializers
 CXXFLAGS := -std=c++11 $(COMMONFLAGS)
 
@@ -80,6 +80,7 @@ ELC_SRCS := \
 	cl.c \
 	cpp.c \
 	cpp_template.c \
+	cpp_functional_template.c \
 	cr.c \
 	cs.c \
 	el.c \
