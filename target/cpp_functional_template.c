@@ -236,7 +236,7 @@ void emit_readable_setup(void) {
     "using namespace ::hdr::elvm;\n"
     "namespace io {\n"
     "  // Replace this with the input before running\n"
-    "  constexpr static char stdin [13] = \"This is text\";\n"
+    "  constexpr static char stdin [] = \"int main() {}\";\n"
     "}");
 }
 
@@ -261,9 +261,15 @@ void emit_program_init(void) {
 }
 
 void cpp_emit_data(Data* data) {
-  emit_line(
-    "using InitMemory = Apply<memory, Array<>>;");
-  (void) data;
+  emit_line("using InitMemory = Apply<memory, Array<");
+  printf("  ");
+  Data* prev = NULL;
+  for(; data; data = data->next) {
+    if(prev) printf(",");
+    printf("Unsigned<%i>", data->v);
+    prev = data;
+  }
+  emit_line(">>;");
 }
 
 void emit_program_runloop(void) {
