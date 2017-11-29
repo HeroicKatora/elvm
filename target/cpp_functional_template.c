@@ -236,7 +236,7 @@ void emit_readable_setup(void) {
     "using namespace ::hdr::elvm;\n"
     "namespace io {\n"
     "  // Replace this with the input before running\n"
-    "  constexpr static char stdin [] = \"\";\n"
+    "  constexpr static char stdin [13] = \"This is text\";\n"
     "}");
 }
 
@@ -254,10 +254,9 @@ void emit_program_init(void) {
     "using runfunc = TypeFunction<RunFunc>;");
   emit_line(
     "template<\n"
-    "  typename Registers0, typename Memory0, typename Stdin0, typename Stdout0,\n"
-    "  typename InvalidPc>\n"
-    "struct RunFunc<State<Registers0, InvalidPc, Memory0, Stdin0, Stdout0>> {\n"
-    "  using type = State<Registers0, Exit, Memory0, Stdin0, Stdout0>;\n"
+    "  typename Registers0, typename Memory0, typename Stdin0, typename Stdout0>\n"
+    "struct RunFunc<State<Registers0, Exit, Memory0, Stdin0, Stdout0>> {\n"
+    "  using type = Stdout0;\n"
     "};");
 }
 
@@ -276,5 +275,7 @@ void emit_program_runloop(void) {
     "  ::hdr::match::With<TerminatePattern, Const<True>>,\n"
     "  ::hdr::match::With<_, Const<False>>>;\n"
     "using FinalState = Apply<until, exit_test, runfunc, InitState>;\n"
-    "int main() { }");
+    "using FinalStdout = Apply<runfunc, FinalState>;\n"
+    "using Output = Apply<collect, FinalStdout>;\n"
+    "int main() { printf(\"%%s\", Output::buffer); }");
 }
