@@ -154,19 +154,19 @@ void cpp_emit_inst(Inst* inst) {
     emit_line(
       "  using Memory%i = Apply<store, %s, %s, Registers%i, Memory%i>;",
       func_state.nr_memory + 1,
-      src.buffer,
       dst.buffer,
+      src.buffer,
       func_state.nr_register,
       func_state.nr_memory);
     func_state.nr_memory++;
   } break;
     // IO
   case PUTC: {
-    dst = cpp_print_value(inst->dst);
+    src = cpp_print_value(inst->src);
     emit_line(
       "  using Stdout%i = Apply<putcop, %s, Registers%i, Stdout%i>;",
       func_state.nr_stdout + 1,
-      dst.buffer,
+      src.buffer,
       func_state.nr_register,
       func_state.nr_stdout);
     func_state.nr_stdout++;
@@ -284,4 +284,5 @@ void emit_program_runloop(void) {
     "using FinalStdout = Apply<runfunc, FinalState>;\n"
     "using Output = Apply<collect, FinalStdout>;\n"
     "int main() { printf(\"%%s\", Output::buffer); }");
+    //"int main() { for(auto c: Output::buffer) { printf(\"%%.2x \", c); } }");
 }
