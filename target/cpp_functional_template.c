@@ -19,46 +19,46 @@ static const FuncState initial_state = { .nr_register = 0, .nr_pc = 0,
   .nr_memory = 0, .nr_stdin = 0, .nr_stdout = 0 };
 
 // The header at the top of the file, where the library and stdin is set up.
-static void emit_readable_setup(void);
+static void cppf_emit_readable_setup(void);
 
 // Necessary constructions for the program part
-static void emit_program_init(void);
-static void emit_program_runloop(void);
+static void cppf_emit_program_init(void);
+static void cppf_emit_program_runloop(void);
 
-static void cpp_emit_pcblocks(Inst* inst);
-static void cpp_emit_data(Data* data);
-static void cpp_emit_block_prologue(int pc);
-static void cpp_emit_block_epilogue(void);
-static void cpp_emit_inst(Inst* inst);
+static void cppf_emit_pcblocks(Inst* inst);
+static void cppf_emit_data(Data* data);
+static void cppf_emit_block_prologue(int pc);
+static void cppf_emit_block_epilogue(void);
+static void cppf_emit_inst(Inst* inst);
 
 void target_cpp_functional_template(Module* module) {
   func_state = initial_state;
 
-  emit_readable_setup();
-  emit_program_init();
+  cppf_emit_readable_setup();
+  cppf_emit_program_init();
 
-  cpp_emit_data(module->data);
-  cpp_emit_pcblocks(module->text);
+  cppf_emit_data(module->data);
+  cppf_emit_pcblocks(module->text);
 
-  emit_program_runloop();
+  cppf_emit_program_runloop();
 }
 
-void cpp_emit_pcblocks(Inst* inst) {
+void cppf_emit_pcblocks(Inst* inst) {
   int prev_pc = -1;
   for(; inst; inst = inst->next) {
     if(prev_pc != inst->pc) {
       if(prev_pc != -1) {
-        cpp_emit_block_epilogue();
+        cppf_emit_block_epilogue();
       }
-      cpp_emit_block_prologue(inst->pc);
+      cppf_emit_block_prologue(inst->pc);
     }
     prev_pc = inst->pc;
-    cpp_emit_inst(inst);
+    cppf_emit_inst(inst);
   }
-  cpp_emit_block_epilogue();
+  cppf_emit_block_epilogue();
 }
 
-void cpp_emit_block_prologue(int pc) {
+void cppf_emit_block_prologue(int pc) {
   emit_line(
     "template<\n"
     "  typename Registers0, typename Memory0, typename Stdin0, typename Stdout0>\n"
@@ -66,7 +66,7 @@ void cpp_emit_block_prologue(int pc) {
     "  using Pc0 = Unsigned<(%i + 1)>;", pc, pc);
 }
 
-void cpp_emit_block_epilogue(void) {
+void cppf_emit_block_epilogue(void) {
   emit_line(
     "  using type = State<Registers%i, Pc%i, Memory%i, Stdin%i, Stdout%i>;"
     " };", func_state.nr_register, func_state.nr_pc, func_state.nr_memory,
@@ -74,8 +74,7 @@ void cpp_emit_block_epilogue(void) {
   func_state = initial_state;
 }
 
-static ValueBuffer cpp_print_value(const Value value) {
-  ValueBuffer buffer;
+static void cppf_print_value(const Value value, ValueBuffer* out) {
   switch(value.type) {
   case REG: {
     const char *regid;
@@ -89,19 +88,18 @@ static ValueBuffer cpp_print_value(const Value value) {
       default:
         error("Unexpected register %i, invalid eir", value.reg);
     }
-    snprintf(buffer.buffer, sizeof(buffer.buffer), "%s", regid);
+    snprintf(out->buffer, sizeof(out->buffer), "%s", regid);
   } break;
   case IMM:
     if(value.imm < 0) {
       error("Unexpected signed integral %i", value.imm);
     } else {
-      snprintf(buffer.buffer, sizeof(buffer.buffer), "Unsigned<%u>", value.imm);
+      snprintf(out->buffer, sizeof(out->buffer), "Unsigned<%u>", value.imm);
     }
   }
-  return buffer;
 }
 
-void cpp_emit_inst(Inst* inst) {
+void cppf_emit_inst(Inst* inst) {
   ValueBuffer dst, src, jmp;
   switch(inst->op) {
     // Functions operation only on registers
@@ -124,8 +122,8 @@ void cpp_emit_inst(Inst* inst) {
     } else {
       error("Logic error, unexpected instruction fallthrough");
     }
-    dst = cpp_print_value(inst->dst);
-    src = cpp_print_value(inst->src);
+    cppf_print_value(inst->dst, &dst);
+    cppf_print_value(inst->src, &src);
     emit_line(
       "  using Registers%i = Apply<%s, %s, %s, Registers%i>;",
       func_state.nr_register + 1,
@@ -137,8 +135,8 @@ void cpp_emit_inst(Inst* inst) {
   } break;
     // Memory - Register communication
   case LOAD: {
-    dst = cpp_print_value(inst->dst);
-    src = cpp_print_value(inst->src);
+    cppf_print_value(inst->dst, &dst);
+    cppf_print_value(inst->src, &src);
     emit_line(
       "  using Registers%i = Apply<load, %s, %s, Registers%i, Memory%i>;",
       func_state.nr_register + 1,
@@ -149,8 +147,8 @@ void cpp_emit_inst(Inst* inst) {
     func_state.nr_register++;
   } break;
   case STORE: {
-    dst = cpp_print_value(inst->dst);
-    src = cpp_print_value(inst->src);
+    cppf_print_value(inst->dst, &dst);
+    cppf_print_value(inst->src, &src);
     emit_line(
       "  using Memory%i = Apply<store, %s, %s, Registers%i, Memory%i>;",
       func_state.nr_memory + 1,
@@ -162,7 +160,7 @@ void cpp_emit_inst(Inst* inst) {
   } break;
     // IO
   case PUTC: {
-    src = cpp_print_value(inst->src);
+    cppf_print_value(inst->src, &src);
     emit_line(
       "  using Stdout%i = Apply<putcop, %s, Registers%i, Stdout%i>;",
       func_state.nr_stdout + 1,
@@ -172,7 +170,7 @@ void cpp_emit_inst(Inst* inst) {
     func_state.nr_stdout++;
   } break;
   case GETC: {
-    dst = cpp_print_value(inst->dst);
+    cppf_print_value(inst->dst, &dst);
     emit_line(
       "  using Registers%i = Apply<peek, %s, Registers%i, Stdin%i>;",
       func_state.nr_register + 1,
@@ -193,9 +191,9 @@ void cpp_emit_inst(Inst* inst) {
   case JGT: // falltrough
   case JLE: // falltrough
   case JGE: {
-    dst = cpp_print_value(inst->dst);
-    src = cpp_print_value(inst->src);
-    jmp = cpp_print_value(inst->jmp);
+    cppf_print_value(inst->dst, &dst);
+    cppf_print_value(inst->src, &src);
+    cppf_print_value(inst->jmp, &jmp);
     const char* compare[] =
       {"jmpeq", "jmpne", "jmplt", "jmpgt", "jmple", "jmpge"};
     emit_line(
@@ -210,7 +208,7 @@ void cpp_emit_inst(Inst* inst) {
     func_state.nr_pc++;
   } break;
   case JMP: {
-    jmp = cpp_print_value(inst->jmp);
+    cppf_print_value(inst->jmp, &jmp);
     emit_line(
       "  using Pc%i = Apply<jmp, %s, Registers%i>;",
       func_state.nr_pc + 1,
@@ -230,7 +228,7 @@ void cpp_emit_inst(Inst* inst) {
   }
 }
 
-void emit_readable_setup(void) {
+void cppf_emit_readable_setup(void) {
   emit_line(
     "#include <hdr/elvm/core.hpp>\n"
     "using namespace ::hdr::elvm;\n"
@@ -240,7 +238,7 @@ void emit_readable_setup(void) {
     "}");
 }
 
-void emit_program_init(void) {
+void cppf_emit_program_init(void) {
   emit_line(
     "using Input = Stdin<io::stdin>;\n"
     "template<\n"
@@ -260,7 +258,7 @@ void emit_program_init(void) {
     "};");
 }
 
-void cpp_emit_data(Data* data) {
+void cppf_emit_data(Data* data) {
   emit_line("using InitMemory = Apply<memory, Array<");
   printf("  ");
   Data* prev = NULL;
@@ -272,7 +270,7 @@ void cpp_emit_data(Data* data) {
   emit_line(">>;");
 }
 
-void emit_program_runloop(void) {
+void cppf_emit_program_runloop(void) {
   emit_line(
     "using ::hdr::match::_;\n"
     "using InitState = State<Registers<>, Unsigned<0>, InitMemory, Input, Stdout>;\n"
